@@ -17,6 +17,8 @@ mod task;
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::syscall::TaskInfo;         // add here
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -34,30 +36,35 @@ pub use context::TaskContext;
 /// existing functions on `TaskManager`.
 pub struct TaskManager {
     /// total number of tasks
-    num_app: usize,
+    pub num_app: usize,
     /// use inner value to get mutable access
-    inner: UPSafeCell<TaskManagerInner>,
+    pub inner: UPSafeCell<TaskManagerInner>,
 }
 
 /// Inner of Task Manager
 pub struct TaskManagerInner {
     /// task list
-    tasks: [TaskControlBlock; MAX_APP_NUM],
+    pub tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
-    current_task: usize,
+    pub current_task: usize,
 }
 
 lazy_static! {
     /// Global variable: TASK_MANAGER
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
+        // 初始化任务数组
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_info: TaskInfo::new(),
         }; MAX_APP_NUM];
+        // 遍历任务数组, 初始化TaskControlBlock
         for (i, task) in tasks.iter_mut().enumerate() {
+            // 将任务的栈指针指向kstack_ptr
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
             task.task_status = TaskStatus::Ready;
+            task.task_info.status = TaskStatus::Ready;         // add here
         }
         TaskManager {
             num_app,
@@ -80,6 +87,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
+        task0.task_info.status = TaskStatus::Running;      // add here
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -95,6 +103,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         inner.tasks[current].task_status = TaskStatus::Ready;
+        inner.tasks[current].task_info.status = TaskStatus::Ready;      // add here
     }
 
     /// Change the status of current `Running` task into `Exited`.
@@ -102,6 +111,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         inner.tasks[current].task_status = TaskStatus::Exited;
+        inner.tasks[current].task_info.status = TaskStatus::Exited;      // add here
     }
 
     /// Find next task to run and return task id.
@@ -109,7 +119,10 @@ impl TaskManager {
     /// In this case, we only return the first `Ready` task in task list.
     fn find_next_task(&self) -> Option<usize> {
         let inner = self.inner.exclusive_access();
+        // 获取当前运行任务的id
         let current = inner.current_task;
+        // 寻找下一个task
+        // 从当前task的下一个开始,遍历所有的task, 循环一圈
         (current + 1..current + self.num_app + 1)
             .map(|id| id % self.num_app)
             .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
@@ -122,11 +135,19 @@ impl TaskManager {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
+            inner.tasks[next].task_info.status = TaskStatus::Running;   // add here
+            if inner.tasks[next].task_info.time == 0 {
+                // 第一次被调用
+                inner.tasks[next].task_info.time = get_time_ms();       // add here
+            }
             inner.current_task = next;
+            // 获取当前task的TaskContext
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
+            // 获取下一个task的TaskContext
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
             // before this, we should drop local variables that must be dropped manually
+            // 切换到下一个task执行
             unsafe {
                 __switch(current_task_cx_ptr, next_task_cx_ptr);
             }

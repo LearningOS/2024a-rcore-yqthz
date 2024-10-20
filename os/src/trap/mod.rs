@@ -65,8 +65,9 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
             exit_current_and_run_next();
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
-            set_next_trigger();
-            suspend_current_and_run_next();
+            // 时钟中断
+            set_next_trigger();    // 重新设计计时器
+            suspend_current_and_run_next();   // 任务切换
         }
         _ => {
             panic!(
