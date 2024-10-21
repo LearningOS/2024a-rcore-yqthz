@@ -18,7 +18,7 @@ use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
 use crate::syscall::TaskInfo;         // add here
-use crate::timer::get_time_ms;
+use crate::timer::get_time_ms;        
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -57,7 +57,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
-            task_info: TaskInfo::new(),
+            task_info: TaskInfo::new(),                 // add here
         }; MAX_APP_NUM];
         // 遍历任务数组, 初始化TaskControlBlock
         for (i, task) in tasks.iter_mut().enumerate() {
