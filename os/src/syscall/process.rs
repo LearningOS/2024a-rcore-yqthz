@@ -1,5 +1,5 @@
 //! Process management syscalls
-// use alloc::sync::Arc;
+use alloc::sync::Arc;
 
 use crate::{
     config::{MAX_SYSCALL_NUM, PAGE_SIZE},
@@ -121,7 +121,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     if let Some((idx, _)) = pair {
         let child = inner.children.remove(idx);
         // confirm that child will be deallocated after being removed from children list
-        // assert_eq!(Arc::strong_count(&child), 1);
+        assert_eq!(Arc::strong_count(&child), 1);
         let found_pid = child.getpid();
         // ++++ temporarily access child PCB exclusively
         let exit_code = child.inner_exclusive_access().exit_code;
