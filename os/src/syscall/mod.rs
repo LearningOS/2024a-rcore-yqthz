@@ -44,9 +44,29 @@ mod fs;
 mod process;
 
 use fs::*;
-use process::*;
+pub use process::*;
+use crate::task::current_task;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    // let processor = PROCESSOR.exclusive_access();
+    // if let Some(task) = processor.current() {
+    //     let mut inner = task.inner_exclusive_access();
+    //     inner.task_info.syscall_times[syscall_id] += 1;
+    //     drop(inner);
+    //     drop(processor);
+    // } 
+    // else {
+    //     drop(processor);
+    //     return  -1;
+    // }
+    let current = current_task().unwrap();
+    let mut inner = current.inner_exclusive_access();
+    inner.task_info.syscall_times[syscall_id] += 1;
+    drop(inner);
+    // let mut inner = TASK_MANAGER.inner.exclusive_access();
+    // let current = inner.current_task;
+    // inner.tasks[current].task_info.syscall_times[syscall_id] += 1;
+    // drop(inner);
     match syscall_id {
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),

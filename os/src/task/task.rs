@@ -8,6 +8,7 @@ use crate::trap::{trap_handler, TrapContext};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use crate::syscall::TaskInfo;
 
 /// Task control block structure
 ///
@@ -21,7 +22,7 @@ pub struct TaskControlBlock {
     pub kernel_stack: KernelStack,
 
     /// Mutable
-    inner: UPSafeCell<TaskControlBlockInner>,
+    pub inner: UPSafeCell<TaskControlBlockInner>,
 }
 
 impl TaskControlBlock {
@@ -68,6 +69,12 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+    /// task info
+    pub task_info: TaskInfo,                  // add here
+    /// stride
+    pub stride: usize,                        // add here
+    /// pass
+    pub pass: usize,                          // add here
 }
 
 impl TaskControlBlockInner {
@@ -118,6 +125,9 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_info: TaskInfo::new(),              // add here
+                    stride: 0,                               // add here
+                    pass: 16,                                // add here
                 })
             },
         };
@@ -191,6 +201,9 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    task_info: TaskInfo::new(),                // add here
+                    stride: 0,                                  // add here
+                    pass: 16,                                 // add here
                 })
             },
         });
@@ -235,6 +248,9 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_info: TaskInfo::new(),              // add here
+                    stride: 0,                              // add here
+                    pass: 0,                               // add here
                 })
             },
         });

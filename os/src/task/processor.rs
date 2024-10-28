@@ -47,6 +47,7 @@ impl Processor {
 }
 
 lazy_static! {
+    /// init
     pub static ref PROCESSOR: UPSafeCell<Processor> = unsafe { UPSafeCell::new(Processor::new()) };
 }
 
@@ -61,6 +62,8 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
+            task_inner.task_info.status = TaskStatus::Running;               // add here
+            task_inner.stride += task_inner.pass;
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
