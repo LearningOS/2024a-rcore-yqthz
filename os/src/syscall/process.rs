@@ -470,19 +470,19 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         current_task().unwrap().pid.0
     );
     // 获取elf文件
-    // let token = current_user_token();
-    // let path = translated_str(token, _path);
-    // if let Some(data) = get_app_data_by_name(path.as_str()) {
-    //     let current_task = current_task().unwrap();
-    //     let new_task = current_task.spawn(data);
-    //     let new_pid = new_task.pid.0;
-    //     add_task(new_task);
-    //     return new_pid as isize;
-    // } 
-    // else {
-    //     return -1;
-    // }
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    if let Some(data) = get_app_data_by_name(path.as_str()) {
+        let current_task = current_task().unwrap();
+        let new_task = current_task.spawn(data);
+        let new_pid = new_task.pid.0;
+        add_task(new_task);
+        return new_pid as isize;
+    } 
+    else {
+        return -1;
+    }
+    
 
     
 }
