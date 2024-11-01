@@ -109,12 +109,15 @@ impl EasyFileSystem {
         // acquire efs lock temporarily
         let (block_id, block_offset) = efs.lock().get_disk_inode_pos(0);
         // release efs lock
-        Inode::new(block_id, block_offset, Arc::clone(efs), block_device)
+        Inode::new(block_id, block_offset, Arc::clone(efs), block_device)    
     }
     /// Get inode by id
     pub fn get_disk_inode_pos(&self, inode_id: u32) -> (u32, usize) {
+        // 获取disk_inode的大小
         let inode_size = core::mem::size_of::<DiskInode>();
+        // 每个block存储inode的数量
         let inodes_per_block = (BLOCK_SZ / inode_size) as u32;
+        // block_id 为inode区域开始的block_id 加上 inode_id / inodes_per_block
         let block_id = self.inode_area_start_block + inode_id / inodes_per_block;
         (
             block_id,

@@ -20,12 +20,13 @@ use lazy_static::*;
 pub struct OSInode {
     readable: bool,
     writable: bool,
-    inner: UPSafeCell<OSInodeInner>,
+    /// inner
+    pub inner: UPSafeCell<OSInodeInner>,
 }
 /// The OS inode inner in 'UPSafeCell'
 pub struct OSInodeInner {
     offset: usize,
-    inode: Arc<Inode>,
+    pub inode: Arc<Inode>,
 }
 
 impl OSInode {
@@ -110,6 +111,7 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
             Some(Arc::new(OSInode::new(readable, writable, inode)))
         } else {
             // create file
+            // println!("create file");
             ROOT_INODE
                 .create(name)
                 .map(|inode| Arc::new(OSInode::new(readable, writable, inode)))
@@ -119,9 +121,21 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
             if flags.contains(OpenFlags::TRUNC) {
                 inode.clear();
             }
+            // println!("find file");
             Arc::new(OSInode::new(readable, writable, inode))
         })
     }
+}
+
+/// create file link
+pub fn create_file_link(old_name: &str, new_name: &str) {
+        ROOT_INODE
+        .create_hard_link(old_name, new_name);
+}
+
+/// unlink file
+pub fn unlink_file(_name: &str) {
+    ROOT_INODE.unlink_file(_name);
 }
 
 impl File for OSInode {
@@ -154,5 +168,8 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
     }
 }

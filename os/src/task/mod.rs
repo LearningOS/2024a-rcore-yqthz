@@ -29,6 +29,7 @@ use lazy_static::*;
 pub use manager::{fetch_task, TaskManager};
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+pub use crate::syscall::TaskInfo;
 
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 pub use manager::add_task;
@@ -76,6 +77,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let mut inner = task.inner_exclusive_access();
     // Change status to Zombie
     inner.task_status = TaskStatus::Zombie;
+    // inner.task_info.status = TaskStatus::Zombie;          // add here
     // Record exit code
     inner.exit_code = exit_code;
     // do not move to its parent but under initproc

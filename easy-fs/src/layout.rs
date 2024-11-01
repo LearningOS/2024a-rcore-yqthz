@@ -6,7 +6,8 @@ use core::fmt::{Debug, Formatter, Result};
 /// Magic number for sanity check
 const EFS_MAGIC: u32 = 0x3b800001;
 /// The max number of direct inodes
-const INODE_DIRECT_COUNT: usize = 28;
+// const INODE_DIRECT_COUNT: usize = 28;
+const INODE_DIRECT_COUNT: usize = 27;                  // add here
 /// The max length of inode name
 const NAME_LENGTH_LIMIT: usize = 27;
 /// The max number of indirect1 inodes
@@ -82,10 +83,11 @@ type DataBlock = [u8; BLOCK_SZ];
 #[repr(C)]
 pub struct DiskInode {
     pub size: u32,
-    pub direct: [u32; INODE_DIRECT_COUNT],
+    pub direct: [u32; INODE_DIRECT_COUNT],            // add here
     pub indirect1: u32,
     pub indirect2: u32,
-    type_: DiskInodeType,
+    pub type_: DiskInodeType,
+    pub nlink: u32,                              // add here
 }
 
 impl DiskInode {
@@ -97,6 +99,19 @@ impl DiskInode {
         self.indirect1 = 0;
         self.indirect2 = 0;
         self.type_ = type_;
+        self.nlink = 1;                       // add here
+    }
+    /// return nlink
+    pub fn get_nlink(&self) -> u32 {
+        self.nlink
+    }
+    /// increase nlink
+    pub fn increase_nlink(&mut self) {
+        self.nlink += 1;
+    }
+    /// decrease nlink
+    pub fn decrease_nlink(&mut self) {
+        self.nlink -= 1;
     }
     /// Whether this inode is a directory
     pub fn is_dir(&self) -> bool {
@@ -137,16 +152,20 @@ impl DiskInode {
         Self::total_blocks(new_size) - Self::total_blocks(self.size)
     }
     /// Get id of block given inner id
+    /// 获取用于保存文件内容的数据块的编号
     pub fn get_block_id(&self, inner_id: u32, block_device: &Arc<dyn BlockDevice>) -> u32 {
         let inner_id = inner_id as usize;
         if inner_id < INODE_DIRECT_COUNT {
+            // 直接索引
             self.direct[inner_id]
         } else if inner_id < INDIRECT1_BOUND {
+            // 先将一级索引读入block cache
             get_block_cache(self.indirect1 as usize, Arc::clone(block_device))
                 .lock()
                 .read(0, |indirect_block: &IndirectBlock| {
                     indirect_block[inner_id - INODE_DIRECT_COUNT]
                 })
+            // 从偏移为零的位置读取一个indirect_block
         } else {
             let last = inner_id - INDIRECT1_BOUND;
             let indirect1 = get_block_cache(self.indirect2 as usize, Arc::clone(block_device))
@@ -356,7 +375,11 @@ impl DiskInode {
         buf: &[u8],
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
+        // 开始位置
         let mut start = offset;
+        // 结束位置, 如果offset + buf.len()比文件的大小大
+        // end = 文件大小
+        // 否则, end为offset + buf.len()
         let end = (offset + buf.len()).min(self.size as usize);
         assert!(start <= end);
         let mut start_block = start / BLOCK_SZ;

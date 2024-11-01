@@ -19,6 +19,7 @@ pub struct Processor {
 
     ///The basic control flow of each core, helping to select and switch process
     idle_task_cx: TaskContext,
+
 }
 
 impl Processor {
