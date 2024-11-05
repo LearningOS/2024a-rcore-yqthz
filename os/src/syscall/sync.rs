@@ -207,10 +207,6 @@ pub fn sys_semaphore_create(res_count: usize) -> isize {
         // drop(process_inner);
     }
 
-    // let tid = sys_gettid() as usize;
-    // drop(process_inner);
-    // println!("tid: {} drop process_inner success", tid);
-
 
     id as isize
 }
