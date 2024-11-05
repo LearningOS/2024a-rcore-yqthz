@@ -1,13 +1,12 @@
 use crate::{
-    config::MAX_SYSCALL_NUM,
-    fs::{open_file, OpenFlags},
-    mm::{translated_ref, translated_refmut, translated_str},
-    task::{
+    config::MAX_SYSCALL_NUM, fs::{open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str}, task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, SignalFlags, TaskStatus,
-    },
+    }
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
+use crate::timer::{get_time_ms, get_time_us};
+use core::mem::size_of;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -167,7 +166,39 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    let user_token = current_user_token();
+    let sec = get_time_ms() / 1000;
+    let usec = get_time_us();
+    let mut time_val = translated_byte_buffer(user_token, _ts as *const u8,  size_of::<TimeVal>());
+    let sec_bytes = sec.to_le_bytes();
+    let usec_bytes = usec.to_le_bytes();
+    // time_val在一个page中
+    if time_val.len() == 1 {
+        for i in 0..sec_bytes.len() {
+            time_val[0][i] = sec_bytes[i];
+        } 
+        for i in 0..usec_bytes.len() {
+            time_val[0][i + 8] = usec_bytes[i];
+        } 
+    }
+    else {
+        // time_val不在一个page中
+        let length = time_val[0].len();
+        for i in 0..length {
+            time_val[0][i] = sec_bytes[i];
+        }
+        if length < 8 {
+            for i in 0..8 - length {
+                time_val[1][i] = sec_bytes[i + length];
+            }
+        }
+        for i in 0..usec_bytes.len() {
+            time_val[1][i + 8 - length] = usec_bytes[i];
+        }
+
+    }
+ 
+    0
 }
 
 /// task_info syscall

@@ -15,6 +15,11 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 
+/// max resource
+pub const MAX_RESOURCES: usize = 5;  // 资源数上限为5
+/// max thread
+pub const MAX_THREADS: usize = 10;   // 线程数上限为5
+
 /// Process Control Block
 pub struct ProcessControlBlock {
     /// immutable
@@ -49,6 +54,14 @@ pub struct ProcessControlBlockInner {
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    /// deadlock
+    pub enable_dead_lock: bool,
+    /// available
+    pub available: [i32; MAX_RESOURCES],
+    /// allocation
+    pub allocation: [[i32; MAX_RESOURCES]; MAX_THREADS],
+    /// need
+    pub need: [[i32; MAX_RESOURCES]; MAX_THREADS],
 }
 
 impl ProcessControlBlockInner {
@@ -82,6 +95,83 @@ impl ProcessControlBlockInner {
     pub fn get_task(&self, tid: usize) -> Arc<TaskControlBlock> {
         self.tasks[tid].as_ref().unwrap().clone()
     }
+    // update need
+    pub fn update_need(&mut self, tid: usize, resource_id: usize) {
+        self.need[tid][resource_id] += 1;
+    }
+
+    // update available
+    pub fn update_available(&mut self, tid: usize, n: i32) {
+        self.available[tid] = n;
+    }
+
+    // update allocation
+    pub fn update_allocation(&mut self, tid: usize, resource_id: usize) {
+        self.allocation[tid][resource_id] += 1;
+        self.available[resource_id] -= 1;
+    }
+
+    // release resources
+    pub fn release_resources(&mut self, tid: usize, resource_id: usize) {
+        self.available[resource_id] += 1;
+        self.allocation[tid][resource_id] -= 1;
+    }
+    /// detect deadlock
+    pub fn deadlock_detect(&self) -> bool {
+        let mut work = [0; MAX_RESOURCES];
+        for i in 0..MAX_RESOURCES {
+            work[i] = self.available[i];
+        }
+
+        let mut finish: [bool; MAX_THREADS] = [false; MAX_THREADS];
+
+        let mut found_thread = true;
+        
+        println!("debug work: {:?}", work);
+
+        println!("debug need: {:?}", self.need);
+
+        while found_thread {
+            found_thread = false;
+
+            for i in 0..MAX_THREADS {
+                if !finish[i] {
+                    let mut can_allocate = true;
+                    for j in 0..MAX_RESOURCES {
+                        if self.need[i][j] > work[j] {
+                            can_allocate = false;
+                            break;
+                        }
+                    }
+
+                    if can_allocate {
+                        for j in 0..MAX_RESOURCES {
+                            work[j] += self.allocation[i][j];
+                        }
+                        finish[i] = true;
+                        found_thread = true;
+                    }
+                }
+            }
+        }
+
+        println!("debug finish: {:?}", finish);
+        for i in 0..MAX_THREADS {
+            if !finish[i] {
+                println!("detect deadlock");
+                return true;
+            }
+        }
+        println!("no detect deadlock");
+        false
+    }
+
+    // pub fn clear() {
+    //         ENABLE_DEADLOCK_DETECT = false;
+    //         AVAILABLE = [0; MAX_RESOURCES];
+    //         ALLOCATION = [[0; MAX_RESOURCES]; MAX_THREADS];
+    //         NEED = [[0; MAX_RESOURCES]; MAX_THREADS];
+    // }
 }
 
 impl ProcessControlBlock {
@@ -119,6 +209,10 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    enable_dead_lock: false,
+                    available: [0; MAX_RESOURCES],                  // add here
+                    allocation: [[0; MAX_RESOURCES]; MAX_THREADS],
+                    need: [[0; MAX_RESOURCES]; MAX_THREADS],
                 })
             },
         });
@@ -245,6 +339,10 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    enable_dead_lock: false,
+                    available: [0; MAX_RESOURCES],                  // add here
+                    allocation: [[0; MAX_RESOURCES]; MAX_THREADS],
+                    need: [[0; MAX_RESOURCES]; MAX_THREADS],
                 })
             },
         });

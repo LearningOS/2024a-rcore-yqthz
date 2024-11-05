@@ -1,9 +1,8 @@
 use crate::{
-    mm::kernel_token,
-    task::{add_task, current_task, TaskControlBlock},
-    trap::{trap_handler, TrapContext},
+    mm::kernel_token, task::{add_task, current_task, TaskControlBlock}, trap::{trap_handler, TrapContext}
 };
 use alloc::sync::Arc;
+
 /// thread create syscall
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     trace!(
@@ -50,8 +49,12 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
         trap_handler as usize,
     );
     (*new_task_trap_cx).x[10] = arg;
+    
+
     new_task_tid as isize
 }
+
+
 /// get current thread id syscall
 pub fn sys_gettid() -> isize {
     trace!(
