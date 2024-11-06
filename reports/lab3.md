@@ -1,22 +1,34 @@
-1. 实现sys_task_info系统调用
+1. 实现sys_spawn系统调用和stride调度算法
 2.  
 
     1. 
-       1. 使用非法的地址
-       2. 使用非法的指令
-       3. 使用非法的寄存器
-    2. 
-      1. 内核栈指针,用户态Trap到内核态后从内核态返回到用户态, 应用程序第一次执行
-      2. sstatus, sepc, sscratch
-       sstatus中的SPP 等字段给出 Trap 发生之前 CPU 处在哪个特权级（S/U）等信息, 通过将SPP设置为User, 当Trap结束后,会返回到用户态
-       sepc指向Trap返回后会执行的下一条指令的地址
-       sscratch 指向内核栈,通过和sp交换保存用户栈指针,当Trap结束后,恢复用户栈指针
-      3. x2指向栈顶,是栈指针,用户栈的栈指针保存在 sscratch 中, x4的值不会变化, 应用程序不使用x4
-      4. 交换 sscratch 和 sp, 交换后sp指向用户栈, sscrath指向内核栈
-      5. sret, 通过设置SPP为User, 表示在Trap前,位于用户态
-      6. 交换 sscratch 和 sp
-      7. ecall
+      - 不是, p2的 stride 累加其 pass 值10后溢出到4
+      - 如果所有进程的步长都较小（即优先级接近且较高），累加后 stride 值的变化幅度很小，此时不同进程的 stride 值就非常接近。这种情况下，stride 值在接近 BigStride（255）时容易溢出，使得两者在溢出后差异变大，导致选错进程
+        如果所有进程的优先级满足优先级>=2, 那么所有 pass 值满足passi <= BigStride / 2, 即每次更新后 stride 值差异也不会超过 BigStride / 2
 
+```rust
+use core::cmp::Ordering;
+
+struct Stride(u64);
+
+impl PartialOrd for Stride {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let big_stride = 255;
+        let diff = self.0.wrapping_sub(other.0);
+        if diff <= big_stride / 2 {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Greater)
+        }
+    }
+}
+
+impl PartialEq for Stride {
+    fn eq(&self, other: &Self) -> bool {
+        false
+    }
+}
+```
 1. 在完成本次实验的过程（含此前学习的过程）中，我曾分别与 以下各位 就（与本次实验相关的）以下方面做过交流，还在代码中对应的位置以注释形式记录了具体的交流对象及内容：
 2. 此外，我也参考了 以下资料 ，还在代码中对应的位置以注释形式记录了具体的参考来源及内容：
 3. 我独立完成了本次实验除以上方面之外的所有工作，包括代码与文档。 我清楚地知道，从以上方面获得的信息在一定程度上降低了实验难度，可能会影响起评分。
